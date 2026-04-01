@@ -1,0 +1,16 @@
+# Ambientes Virtuais
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Segurança (IMPORTANTE)
+.env
+app/core/serviceAccountKey.json
+
+# IDEs
+.vscode/
+.idea/
