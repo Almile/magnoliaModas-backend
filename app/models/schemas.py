@@ -2,16 +2,24 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
+# --- USUÁRIO ---from pydantic import BaseModel, EmailStr, Field
+
 
 # --- USUÁRIO ---
 class UsuarioBase(BaseModel):
     nome_usuario: str
     email: EmailStr
 
-class UsuarioCreate(UsuarioBase):
-    senha: str  #fazer o hash
+class UsuarioCreate(BaseModel):
+    nome_usuario: str
+    email: EmailStr
+    senha: str
+    role: str = "funcionario"
 
 # --- PRODUTO ---
+
+# Dica: Defina o Base antes para que o Create e o Update herdem dele
 class ProdutoBase(BaseModel):
     nome: str
     descricao: str
@@ -25,12 +33,22 @@ class ProdutoBase(BaseModel):
 class ProdutoCreate(ProdutoBase):
     pass
 
+# O Update agora herda do Base, mas torna tudo Opcional
+class ProdutoUpdate(BaseModel):
+    nome: Optional[str] = None
+    preco_base: Optional[float] = None # Ajustado para bater com o nome do campo no Base
+    descricao: Optional[str] = None
+    categoria: Optional[str] = None
+    estacao: Optional[str] = None
+    tags: Optional[List[str]] = None
+    processado_ml: Optional[bool] = None
+
 # --- ESTOQUE ---
 class EstoqueBase(BaseModel):
-    id_produto: str  # FK para o Produto
+    id_produto: str
     codigo_barras: str
-    tamanho: str
-    cor: str
+    tamanhos: List[str] = [] # Ex: ["P", "M", "G"]
+    cores: List[str] = []
     quantidade: int
 
 class EstoqueCreate(EstoqueBase):
@@ -49,4 +67,4 @@ class VendaCreate(BaseModel):
     nome_comprador: str
     telefone_comprador: str
     dados_pagamento: str
-    itens: List[ItemVenda] # Lista de itens que compõem a venda
+    itens: List[ItemVenda]

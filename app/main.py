@@ -1,11 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import produtos
+from app.routes import produtos, auth, estoque, ml, vendas 
+from fastapi.security import HTTPBearer
 
-# 1. Instancia o app apenas UMA vez
-app = FastAPI(title="Gestão de Loja API")
+security = HTTPBearer()
 
-# 2. Configura o CORS nesta instância
+app = FastAPI(title="API - Magnólia Modas", swagger_ui_parameters={"persistAuthorization": True})
+
+# Configura o CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,15 +16,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. Inclui as rotas nesta mesma instância
-app.include_router(produtos.router, prefix="/produtos", tags=["Produtos"])
-app.include_router(produtos.router, prefix="/auth", tags=["auth"])
-app.include_router(produtos.router, prefix="/estoque", tags=["Estoque"])
-app.include_router(produtos.router, prefix="/ml", tags=["Machine learning"])
-app.include_router(produtos.router, prefix="/vendas", tags=["Vendas"])
+# Rotas
+app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
+app.include_router(produtos.router, prefix="/produtos", tags=["Produtos"],dependencies=[Depends(security)])
+app.include_router(estoque.router, prefix="/estoque", tags=["Estoque"])
+app.include_router(ml.router, prefix="/ml", tags=["Machine Learning"])
+app.include_router(vendas.router, prefix="/vendas", tags=["Vendas"])
 
-
-# 4. Define a rota home
 @app.get("/")
 def home():
-    return {"message": "API de Gestão de Loja Online"}
+    return {"message": "API - Magnólia Modas - acesse /docs para ver e testar os endpoints."}
