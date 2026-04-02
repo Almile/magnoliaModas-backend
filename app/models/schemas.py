@@ -3,8 +3,6 @@ from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-# --- USUÁRIO ---from pydantic import BaseModel, EmailStr, Field
-
 
 # --- USUÁRIO ---
 class UsuarioBase(BaseModel):
@@ -19,7 +17,6 @@ class UsuarioCreate(BaseModel):
 
 # --- PRODUTO ---
 
-# Dica: Defina o Base antes para que o Create e o Update herdem dele
 class ProdutoBase(BaseModel):
     nome: str
     descricao: str
@@ -33,10 +30,9 @@ class ProdutoBase(BaseModel):
 class ProdutoCreate(ProdutoBase):
     pass
 
-# O Update agora herda do Base, mas torna tudo Opcional
 class ProdutoUpdate(BaseModel):
     nome: Optional[str] = None
-    preco_base: Optional[float] = None # Ajustado para bater com o nome do campo no Base
+    preco_base: Optional[float] = None
     descricao: Optional[str] = None
     categoria: Optional[str] = None
     estacao: Optional[str] = None

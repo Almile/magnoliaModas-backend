@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 security = HTTPBearer()
 
 async def verificar_admin(credenciais: HTTPAuthorizationCredentials = Depends(security)):
-    token = credenciais.credentials # O FastAPI já corta o "Bearer " pra você aqui!
+    token = credenciais.credentials 
     try:
         decoded_token = auth.verify_id_token(token)
         if decoded_token.get('role') != 'admin':
