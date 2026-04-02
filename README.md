@@ -27,9 +27,11 @@ source venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
-### 4. Configurar as Chaves do firebase
-
-- Você precisa do arquivo serviceAccountKey.json dentro da pasta app/core/ para o banco de dados funcionar.
+### 4. Configuração de Credenciais
+1. Coloque o arquivo `serviceAccountKey.json` em `app/core/`.
+2. Crie um arquivo `.env` na raiz do projeto utilize o arquivo `.env.example` como base.
+3. Dentro do `.env`, adicione: 
+   `FIREBASE_CREDENTIALS_PATH=app/core/serviceAccountKey.json`
 
 ### 5. Rodar o Servidor
 ```bash
