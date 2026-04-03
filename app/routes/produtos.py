@@ -25,13 +25,32 @@ async def listar_produtos():
     try:
         produtos_ref = db.collection("produtos").stream()
         lista_produtos = []
+        
         for doc in produtos_ref:
             item = doc.to_dict()
             item["id"] = doc.id
+            
+            estoque_ref = db.collection("estoques").where("id_produto", "==", doc.id).stream()
+            item["estoque"] = [variacao.to_dict() for variacao in estoque_ref]
             lista_produtos.append(item)
         return lista_produtos
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{produto_id}")
+async def buscar_produto(produto_id: str):
+    doc = db.collection("produtos").document(produto_id).get()
+    
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    
+    produto_data = doc.to_dict()
+    produto_data["id"] = doc.id
+    
+    estoque_ref = db.collection("estoques").where("id_produto", "==", produto_id).stream()
+    produto_data["estoque"] = [variacao.to_dict() for variacao in estoque_ref]
+    
+    return produto_data
 
 @router.post("/adicionar-produto")
 async def adicionar_produto(payload: ProdutoComEstoqueCreate):
@@ -60,13 +79,6 @@ async def adicionar_produto(payload: ProdutoComEstoqueCreate):
     except Exception as e:
         print(f"Erro ao salvar: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/{produto_id}")
-async def buscar_produto(produto_id: str):
-    doc = db.collection("produtos").document(produto_id).get()
-    if doc.exists:
-        return {**doc.to_dict(), "id": doc.id}
-    raise HTTPException(status_code=404, detail="Produto não encontrado")
 
 @router.put("/{produto_id}")
 async def atualizar_produto(produto_id: str, produto: ProdutoUpdate):
