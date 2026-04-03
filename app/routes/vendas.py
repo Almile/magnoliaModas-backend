@@ -2,6 +2,6 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/vendas")
+@router.get("/")
 async def listar_vendas():
     return {"msg": "vendas"}
