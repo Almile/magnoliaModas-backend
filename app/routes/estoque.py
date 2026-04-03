@@ -2,6 +2,6 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/estoque")
+@router.get("/")
 async def listar_estoque():
     return {"msg": "Lista de produtos no estoque"}

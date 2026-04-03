@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Header, Depends
 from app.core.firebase import db
 from firebase_admin import auth
-from app.models.schemas import ProdutoCreate, ProdutoUpdate
+from app.models.schemas import ProdutoCreate, ProdutoUpdate, ProdutoComEstoqueCreate
 from typing import List
 
 router = APIRouter()
@@ -34,13 +34,31 @@ async def listar_produtos():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/adicionar-produto")
-async def adicionar_produto(produto: ProdutoCreate):
+async def adicionar_produto(payload: ProdutoComEstoqueCreate):
     try:
-        doc_ref = db.collection("produtos").document()
-        dados_produto = produto.model_dump(mode="json")
-        doc_ref.set(dados_produto)
-        return {"id": doc_ref.id, "status": "sucesso"}
+        dados_produto = payload.model_dump(exclude={'estoque_inicial'}, mode="json")
+        
+        doc_ref_produto = db.collection("produtos").document()
+        id_produto_gerado = doc_ref_produto.id
+        doc_ref_produto.set(dados_produto)
+
+        for item in payload.estoque_inicial:
+            estoque_ref = db.collection("estoques").document()
+            dados_estoque = {
+                "id_produto": id_produto_gerado,
+                "tamanho": item.tamanho,
+                "cor": item.cor,
+                "quantidade": item.quantidade,
+                "codigo_barras": item.codigo_barras or f"TEMP-{id_produto_gerado}-{item.tamanho}",
+            }
+            estoque_ref.set(dados_estoque)
+        return {
+            "id": id_produto_gerado, 
+            "status": "sucesso", 
+            "msg": f"Produto e {len(payload.estoque_inicial)} variações criadas."
+        }
     except Exception as e:
+        print(f"Erro ao salvar: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{produto_id}")
