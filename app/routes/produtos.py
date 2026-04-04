@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form
 from app.core.firebase import db
 from firebase_admin import auth
 from app.models.schemas import ProdutoCreate, ProdutoUpdate, ProdutoComEstoqueCreate
+from app.services.cloudinary_service import upload_imagem_cloudinary
 from typing import List
+import json
+from datetime import datetime
 
 router = APIRouter()
 
@@ -52,32 +55,102 @@ async def buscar_produto(produto_id: str):
     
     return produto_data
 
+def salvar_estoque_inicial(id_produto: str, lista_estoque: list):
+    for item in lista_estoque:
+        estoque_ref = db.collection("estoques").document()
+        dados_estoque = {
+            "id_produto": id_produto,
+            "tamanho": item.get("tamanho", "U"),
+            "cor": item.get("cor", "N/A"),
+            "quantidade": item.get("quantidade", 0),
+            "codigo_barras": item.get("codigo_barras") or f"TEMP-{id_produto}-{item.get('tamanho')}",
+        }
+        estoque_ref.set(dados_estoque)
+
 @router.post("/adicionar-produto")
-async def adicionar_produto(payload: ProdutoComEstoqueCreate):
+async def adicionar_produto(
+    nome: str = Form(...),
+    descricao: str = Form(...),
+    categoria: str = Form(...),
+    estacao: str = Form(...),
+    preco_base: float = Form(...),
+    tags: str = Form('["tag1", "tag2"]'),
+    estoque_inicial: str = Form('[{"tamanho": "M", "cor": "Xadrez", "quantidade": 10}]'),
+    imagem: UploadFile = File(None)
+):
     try:
-        dados_produto = payload.model_dump(exclude={'estoque_inicial'}, mode="json")
+        try:
+            lista_tags = json.loads(tags.replace("'", '"')) 
+        except (json.JSONDecodeError, TypeError):
+            lista_tags = [t.strip() for t in tags.split(",")] if tags else []
+        try:
+            lista_estoque = json.loads(estoque_inicial) if estoque_inicial.strip() else []
+        except (json.JSONDecodeError, TypeError):
+            lista_estoque = [{"tamanho": "U", "cor": "Padrão", "quantidade": 0}]
+
+        url_foto = await upload_imagem_cloudinary(imagem) if imagem else None
+        novo_produto = {
+            "nome": nome,
+            "descricao": descricao,
+            "categoria": categoria,
+            "estacao": estacao,
+            "preco_base": preco_base,
+            "imagem": url_foto,
+            "tags": lista_tags,
+            "data_cadastro": datetime.now(),
+            "processado_ml": False
+        }
+
+        doc_ref_produto = db.collection("produtos").document()
+        id_produto_gerado = doc_ref_produto.id
+        doc_ref_produto.set(novo_produto)
+
+        salvar_estoque_inicial(id_produto_gerado, lista_estoque)
+
+        return {"id": id_produto_gerado, "status": "sucesso", "url_imagem": url_foto}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+
+@router.post("/adicionar-produto-machine-learning")
+async def adicionar_produto_ml(
+    nome: str = Form(...),
+    preco: float = Form(...),
+    imagem: UploadFile = File(...),
+    estoque_inicial: str = Form('[{"tamanho": "U", "cor": "Pendente", "quantidade": 0}]'),
+    descricao: str = Form("Gerado automaticamente via IA"),
+    categoria: str = Form("Pendente"),
+    estacao: str = Form("Pendente")
+):
+    try:
+        url_foto = await upload_imagem_cloudinary(imagem)
+        if not url_foto:
+            raise HTTPException(status_code=500, detail="Erro ao subir imagem")
+
+        novo_produto = {
+            "nome": nome,
+            "preco_base": preco,
+            "descricao": descricao,
+            "categoria": categoria,
+            "estacao": estacao,
+            "imagem": url_foto,
+            "data_cadastro": datetime.now(),
+            "processado_ml": True
+        }
         
         doc_ref_produto = db.collection("produtos").document()
         id_produto_gerado = doc_ref_produto.id
-        doc_ref_produto.set(dados_produto)
+        doc_ref_produto.set(novo_produto)
 
-        for item in payload.estoque_inicial:
-            estoque_ref = db.collection("estoques").document()
-            dados_estoque = {
-                "id_produto": id_produto_gerado,
-                "tamanho": item.tamanho,
-                "cor": item.cor,
-                "quantidade": item.quantidade,
-                "codigo_barras": item.codigo_barras or f"TEMP-{id_produto_gerado}-{item.tamanho}",
-            }
-            estoque_ref.set(dados_estoque)
+        lista_estoque = json.loads(estoque_inicial)
+        salvar_estoque_inicial(id_produto_gerado, lista_estoque)
+
         return {
             "id": id_produto_gerado, 
-            "status": "sucesso", 
-            "msg": f"Produto e {len(payload.estoque_inicial)} variações criadas."
+            "url": url_foto, 
+            "msg": "Produto e variação inicial criados via ML"
         }
     except Exception as e:
-        print(f"Erro ao salvar: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{produto_id}")

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Body
 from app.core.firebase import db
 from datetime import datetime
+from app.models.schemas import EstoqueBase
 
 router = APIRouter()
 
@@ -86,5 +87,41 @@ async def repor_estoque(variacao_id: str, quantidade_adicionada: int = Body(...,
             "data": datetime.now()
         })
         return {"status": "sucesso", "novo_estoque": nova_qtd}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/adicionar-variacao")
+async def adicionar_variacao(payload: EstoqueBase, id_produto: str):
+    try:
+        produto_ref = db.collection("produtos").document(id_produto).get()
+        if not produto_ref.exists:
+            raise HTTPException(status_code=404, detail="Produto pai não encontrado.")
+
+        nova_variacao_ref = db.collection("estoques").document()
+        id_gerado = nova_variacao_ref.id
+        
+        dados_variacao = {
+            "id_produto": id_produto,
+            "tamanho": payload.tamanho,
+            "cor": payload.cor,
+            "quantidade": payload.quantidade,
+            "codigo_barras": payload.codigo_barras or f"TEMP-{id_produto}-{payload.tamanho}-{payload.cor}",
+        }
+        
+        nova_variacao_ref.set(dados_variacao)
+
+        db.collection("historico_estoque").add({
+            "id_produto_estoque": id_gerado,
+            "tipo": "Entrada",
+            "quantidade": payload.quantidade,
+            "motivo": "Criação de nova variação/grade",
+            "data": datetime.now()
+        })
+
+        return {
+            "status": "sucesso", 
+            "id_variacao": id_gerado, 
+            "msg": f"Variação {payload.tamanho} - {payload.cor} adicionada ao produto."
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
