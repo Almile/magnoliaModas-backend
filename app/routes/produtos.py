@@ -6,6 +6,9 @@ from app.services.cloudinary_service import upload_imagem_cloudinary
 from typing import List
 import json
 from datetime import datetime
+from fastapi import Query
+from typing import Optional
+
 
 router = APIRouter()
 
@@ -39,6 +42,48 @@ async def listar_produtos():
         return lista_produtos
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/filtrar")
+async def filtrar_produtos(
+    categoria: Optional[str] = Query(None),
+    estacao: Optional[str] = Query(None),
+    processado_ml: Optional[bool] = Query(None),
+    preco_min: Optional[float] = Query(None),
+    preco_max: Optional[float] = Query(None),
+    nome: Optional[str] = Query(None)
+):
+    try:
+        query = db.collection("produtos")
+        filtros_exatos = {
+            "categoria": categoria,
+            "processado_ml": processado_ml
+        }
+        for campo, valor in filtros_exatos.items():
+            if valor is not None:
+                query = query.where(campo, "==", valor)
+
+        if preco_min is not None:
+            query = query.where("preco_base", ">=", preco_min)
+        if preco_max is not None:
+            query = query.where("preco_base", "<=", preco_max)
+
+        docs = query.stream()
+        lista_produtos = []
+
+        for doc in docs:
+            item = doc.to_dict()
+            item["id"] = doc.id
+            match_estacao = not estacao or estacao.lower() in item.get("estacao", "").lower()
+            match_nome = not nome or nome.lower() in item.get("nome", "").lower()
+            if not (match_estacao and match_nome):
+                continue
+
+            estoque_ref = db.collection("estoques").where("id_produto", "==", doc.id).stream()
+            item["estoque"] = [v.to_dict() for v in estoque_ref]
+            lista_produtos.append(item)
+        return lista_produtos
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro dinâmico: {str(e)}")
 
 @router.get("/{produto_id}")
 async def buscar_produto(produto_id: str):
@@ -111,47 +156,6 @@ async def adicionar_produto(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
-
-@router.post("/adicionar-produto-machine-learning")
-async def adicionar_produto_ml(
-    nome: str = Form(...),
-    preco: float = Form(...),
-    imagem: UploadFile = File(...),
-    estoque_inicial: str = Form('[{"tamanho": "U", "cor": "Pendente", "quantidade": 0}]'),
-    descricao: str = Form("Gerado automaticamente via IA"),
-    categoria: str = Form("Pendente"),
-    estacao: str = Form("Pendente")
-):
-    try:
-        url_foto = await upload_imagem_cloudinary(imagem)
-        if not url_foto:
-            raise HTTPException(status_code=500, detail="Erro ao subir imagem")
-
-        novo_produto = {
-            "nome": nome,
-            "preco_base": preco,
-            "descricao": descricao,
-            "categoria": categoria,
-            "estacao": estacao,
-            "imagem": url_foto,
-            "data_cadastro": datetime.now(),
-            "processado_ml": True
-        }
-        
-        doc_ref_produto = db.collection("produtos").document()
-        id_produto_gerado = doc_ref_produto.id
-        doc_ref_produto.set(novo_produto)
-
-        lista_estoque = json.loads(estoque_inicial)
-        salvar_estoque_inicial(id_produto_gerado, lista_estoque)
-
-        return {
-            "id": id_produto_gerado, 
-            "url": url_foto, 
-            "msg": "Produto e variação inicial criados via ML"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{produto_id}")
 async def atualizar_produto(produto_id: str, produto: ProdutoUpdate):
