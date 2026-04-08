@@ -173,15 +173,3 @@ async def atualizar_produto(produto_id: str, produto: ProdutoUpdate):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.delete("/{produto_id}")
-async def deletar(produto_id: str, user=Depends(verificar_admin)):
-    try:
-        doc_ref = db.collection("produtos").document(produto_id)
-        if not doc_ref.get().exists:
-            raise HTTPException(status_code=404, detail="Produto não encontrado")
-        
-        doc_ref.delete()
-        return {"status": "removido", "id": produto_id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
