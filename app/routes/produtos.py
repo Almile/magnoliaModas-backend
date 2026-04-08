@@ -9,7 +9,6 @@ from datetime import datetime
 from fastapi import Query
 from typing import Optional
 
-
 router = APIRouter()
 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -119,31 +118,38 @@ async def adicionar_produto(
     categoria: str = Form(...),
     estacao: str = Form(...),
     preco_base: float = Form(...),
-    tags: str = Form('["tag1", "tag2"]'),
-    estoque_inicial: str = Form('[{"tamanho": "M", "cor": "Xadrez", "quantidade": 10}]'),
-    imagem: UploadFile = File(None)
+    tags: str = Form('[]'),
+    estoque_inicial: str = Form('[]'),
+    imagem: UploadFile = File(None),
+    imagem_url: Optional[str] = Form(None)
 ):
     try:
         try:
             lista_tags = json.loads(tags.replace("'", '"')) 
-        except (json.JSONDecodeError, TypeError):
-            lista_tags = [t.strip() for t in tags.split(",")] if tags else []
+        except:
+            lista_tags = []
+        
         try:
-            lista_estoque = json.loads(estoque_inicial) if estoque_inicial.strip() else []
-        except (json.JSONDecodeError, TypeError):
-            lista_estoque = [{"tamanho": "U", "cor": "Padrão", "quantidade": 0}]
+            lista_estoque = json.loads(estoque_inicial)
+        except:
+            lista_estoque = []
+        url_final = None
 
-        url_foto = await upload_imagem_cloudinary(imagem) if imagem else None
+        if imagem:
+            url_final = await upload_imagem_cloudinary(imagem)
+        elif imagem_url:
+            url_final = imagem_url
+        
         novo_produto = {
             "nome": nome,
             "descricao": descricao,
             "categoria": categoria,
             "estacao": estacao,
             "preco_base": preco_base,
-            "imagem": url_foto,
+            "imagem": url_final,
             "tags": lista_tags,
             "data_cadastro": datetime.now(),
-            "processado_ml": False
+            "processado_ml": True if imagem_url else False
         }
 
         doc_ref_produto = db.collection("produtos").document()
@@ -152,7 +158,7 @@ async def adicionar_produto(
 
         salvar_estoque_inicial(id_produto_gerado, lista_estoque)
 
-        return {"id": id_produto_gerado, "status": "sucesso", "url_imagem": url_foto}
+        return {"id": id_produto_gerado, "status": "sucesso", "url_imagem": url_final}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
