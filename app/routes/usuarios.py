@@ -1,12 +1,42 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.core.firebase import db
-from firebase_admin import auth
+from firebase_admin import auth, firestore
 from .produtos import verificar_admin
 from app.models.schemas import UsuarioBase, UsuarioCreate
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter()
         
+@router.post("/criar-funcionario")
+async def criar_funcionario(usuario: UsuarioCreate, admin_logado=Depends(verificar_admin)):
+    try:
+        user_record = auth.create_user(
+            email=usuario.email,
+            password=usuario.senha,
+            display_name=usuario.nome_usuario
+        )
+
+        auth.set_custom_user_claims(user_record.uid, {'role': usuario.role})
+        
+        dados_usuario = {
+            "nome": usuario.nome_usuario,
+            "email": usuario.email,
+            "role": usuario.role,
+            "status": "ativo",
+            "data_cadastro": firestore.SERVER_TIMESTAMP
+        }
+        
+        db.collection("usuarios").document(user_record.uid).set(dados_usuario)
+
+        return {
+            "uid": user_record.uid, 
+            "status": "Funcionário cadastrado com sucesso",
+            "role": usuario.role
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Erro ao criar usuário: {str(e)}")
+
 @router.get("/")
 async def listar_funcionarios(user=Depends(verificar_admin)):
     try:
@@ -36,7 +66,9 @@ async def editar_funcionario(usuario_id: str, dados: UsuarioBase, user=Depends(v
 @router.delete("/{usuario_id}")
 async def excluir_funcionario(usuario_id: str, user=Depends(verificar_admin)):
     try:
+        auth.delete_user(usuario_id)
         db.collection("usuarios").document(usuario_id).delete()
+        
         return {"status": "removido", "id": usuario_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
