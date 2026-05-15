@@ -102,12 +102,15 @@ async def buscar_produto(produto_id: str):
 def salvar_estoque_inicial(id_produto: str, lista_estoque: list):
     for item in lista_estoque:
         estoque_ref = db.collection("estoques").document()
+        
+        codigo = item.get("codigo_barras") 
+        
         dados_estoque = {
             "id_produto": id_produto,
             "tamanho": item.get("tamanho", "U"),
             "cor": item.get("cor", "N/A"),
             "quantidade": item.get("quantidade", 0),
-            "codigo_barras": item.get("codigo_barras") or f"TEMP-{id_produto}-{item.get('tamanho')}",
+            "codigo_barras": codigo if codigo else None, 
         }
         estoque_ref.set(dados_estoque)
 
