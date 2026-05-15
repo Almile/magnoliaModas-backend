@@ -114,6 +114,30 @@ def salvar_estoque_inicial(id_produto: str, lista_estoque: list):
         }
         estoque_ref.set(dados_estoque)
 
+@router.get("/buscar-por-codigo/{codigo}")
+async def buscar_produto_por_codigo(codigo: str):
+    # Busca na coleção 'estoques' onde o codigo_barras é igual ao bipaod
+    estoque_query = db.collection("estoques").where("codigo_barras", "==", codigo).limit(1).stream()
+    
+    estoque_doc = None
+    for doc in estoque_query:
+        estoque_doc = doc.to_dict()
+        break
+
+    if not estoque_doc:
+        raise HTTPException(status_code=404, detail="Produto não encontrado com este código.")
+
+    # Com o id_produto do estoque, buscamos o produto completo
+    produto_ref = db.collection("produtos").document(estoque_doc["id_produto"]).get()
+    
+    if not produto_ref.exists:
+        raise HTTPException(status_code=404, detail="Produto mestre não encontrado.")
+
+    produto_data = produto_ref.to_dict()
+    produto_data["id"] = produto_ref.id
+    
+    return produto_data
+
 @router.post("/adicionar-produto")
 async def adicionar_produto(
     nome: str = Form(...),
