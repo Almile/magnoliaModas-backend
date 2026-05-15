@@ -62,10 +62,11 @@ async def login_usuario(email: str, senha: str):
             "localId": data["localId"]
         }
 
-@router.post("/logout/{uid}")
-async def logout_seguro(uid: str):
-    try:
-        auth.revoke_refresh_tokens(uid)
-        return {"status": "sucesso", "message": f"Sessões revogadas para o usuário {uid}"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erro ao deslogar: {str(e)}")
+@router.post("/logout")
+async def logout(user=Depends(get_current_user)):
+    uid = user["uid"]
+    auth.revoke_refresh_tokens(uid)
+    return {
+        "status": "sucesso",
+        "message": "Sessões revogadas com sucesso."
+    }
