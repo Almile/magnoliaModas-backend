@@ -1,10 +1,12 @@
 import os
+import os
 from dotenv import load_dotenv
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from firebase_admin import auth, firestore
 from app.core.firebase import db
 from app.models.schemas import UsuarioCreate
+from app.core.auth import get_current_user
 
 load_dotenv() 
 
